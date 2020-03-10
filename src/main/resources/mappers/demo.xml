@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.dao.DemoMapper">
+    <update id="createTable">
+        CREATE TABLE IF NOT EXISTS `demo`(
+       `demo_id` INT UNSIGNED AUTO_INCREMENT,
+       `demo_title` VARCHAR(100) NOT NULL,
+       `demo_author` VARCHAR(40) NOT NULL,
+       `date` DATE,
+       PRIMARY KEY ( `demo_id` )
+        )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    </update>
+
+    <insert id="insertData">
+        INSERT INTO demo (demo_title,demo_author) VALUES (#{title},#{author});
+    </insert>
+
+</mapper>
