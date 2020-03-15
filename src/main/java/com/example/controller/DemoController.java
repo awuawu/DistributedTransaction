@@ -11,6 +11,8 @@ import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.Stat;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpRequest;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 import com.example.service.ZookeeperService;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 @RestController
 public class DemoController {
@@ -63,10 +68,10 @@ public class DemoController {
         return "Hello World 呵呵";
     }
 
-    @Transactional
+//    @Transactional
     @MyTransactional(isStart = true)
     @RequestMapping("/call")
-    public String call(String title,String author,Integer num1,Integer num2){
+    public String call(String title, String author, Integer num1, Integer num2, String groupId){
         demoMapper.insertData("t3","a3");
         Thread ct = Thread.currentThread();
         new Thread(()->{ String res = restTemplate.getForObject("http://localhost:8082/call?groupId={1}&title={2}&author={3}&num2={4}",String.class, TxManager.txGroup.get(ct),title,author,num2);}).start();
@@ -98,6 +103,31 @@ public class DemoController {
 
             //3. 启动监听器
             nodeCache.start();
+
+            TreeCache treeCache = new TreeCache(zkClient, "/"+path);
+            PathChildrenCache pathChildrenCache = new PathChildrenCache(zkClient, "/"+path, true);
+            treeCache.start();
+            pathChildrenCache.start();
+            pathChildrenCache.getListenable().addListener(new PathChildrenCacheListener() {
+                @Override
+                public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
+                    ChildData eventData = event.getData();
+                    switch (event.getType()) {
+                        case CONNECTION_LOST:
+                            System.out.println(eventData.getPath() + "节点断开连接......");
+                            if(new String(client.getData().forPath("/"+path)).equals("init"))
+                                client.setData().forPath("/"+path,"rollBack".getBytes());
+                            break;
+                        case CHILD_REMOVED:
+                            System.out.println(eventData.getPath() + "节点被删除......"+new Date());
+                            if(new String(client.getData().forPath("/"+path)).equals("init"))
+                                client.setData().forPath("/"+path,"rollBack".getBytes());
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            });
         } catch (Exception e) {
             e.printStackTrace();
         }

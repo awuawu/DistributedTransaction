@@ -16,7 +16,7 @@ public class Configer {
     public CuratorFramework curatorFramework(){
         RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
         CuratorFramework client = CuratorFrameworkFactory.newClient("127.0.0.1:2181",
-                50000, 50000, retryPolicy);
+                3000, 50000, retryPolicy);
         client.start();
         NodeCache nodeCache = new NodeCache(client,"/nodeA");
         nodeCache.getListenable().addListener(()->{

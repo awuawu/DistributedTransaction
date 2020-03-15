@@ -3,37 +3,38 @@ package com.example.aspect;
 import com.example.annotation.MyTransactional;
 import com.example.entity.Msg;
 import com.example.entity.TxManager;
+import com.example.exception.MyException;
 import com.example.util.LockConditionUtil;
-import org.apache.curator.RetryPolicy;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.*;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
 import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.locks.ReentrantLock;
-
-import org.apache.commons.lang3.ArrayUtils;
 
 @Aspect
 @Component
 public class BussinessAspect implements Ordered {
     @Autowired
     private CuratorFramework client;
+
+    @Autowired
+    private RestTemplate restTemplate;
 
 
     @Around("@annotation(com.example.annotation.MyTransactional)")
@@ -48,12 +49,17 @@ public class BussinessAspect implements Ordered {
         Object[] args = joinPoint.getArgs();
         //2.最关键的一步:通过这获取到方法的所有参数名称的字符串数组
         String[] parameterNames = methodSignature.getParameterNames();
-        int timeStampIndex = ArrayUtils.indexOf(parameterNames, "groupId");
-        if (timeStampIndex != -1) { //非事务发起者设置groupId
-            String groupId = (String) args[timeStampIndex];
-            msg.setGroupId(groupId);
-            TxManager.txGroup.put(Thread.currentThread(), groupId);
+        int groupIdIndex = ArrayUtils.indexOf(parameterNames, "groupId");
+        if (groupIdIndex != -1) {
+            String groupId = (String) args[groupIdIndex];
+            if(groupId != null){ //非事务发起者设置groupId
+                msg.setGroupId(groupId);
+                TxManager.txGroup.put(Thread.currentThread(), groupId);
+            }
+        }else{
+            throw new MyException("使用MyTransactional注解的方法需加参数groupId....");
         }
+
 
         Thread ct = Thread.currentThread();
         String zkLocalId = UUID.randomUUID().toString();
@@ -90,8 +96,8 @@ public class BussinessAspect implements Ordered {
                         public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
                             ChildData eventData = event.getData();
                             switch (event.getType()) {
-                                case CONNECTION_LOST:
-                                    System.out.println(eventData.getPath() + "节点断开连接......");
+                                case CHILD_REMOVED:
+                                    System.out.println(eventData.getPath() + "节点被删除......");
                                     if(new String(client.getData().forPath(pathZkGroupId)).equals("init"))
                                         client.setData().forPath(pathZkGroupId,"rollBack".getBytes());
                                     break;
@@ -171,7 +177,32 @@ public class BussinessAspect implements Ordered {
             } catch (Exception e) {
                 e.printStackTrace();
             }*/
+        }else{
+            try {
+                PathChildrenCache pathChildrenCache = new PathChildrenCache(client, "/"+msg.getGroupId(), true);
+                pathChildrenCache.start();
+                pathChildrenCache.getListenable().addListener(new PathChildrenCacheListener() {
+                    @Override
+                    public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
+                        ChildData eventData = event.getData();
+                        switch (event.getType()) {
+                            case CHILD_REMOVED:
+                                System.out.println(eventData.getPath() + "节点被删除......");
+                                if(new String(client.getData().forPath("/"+msg.getGroupId())).equals("init"))
+                                    client.setData().forPath("/"+msg.getGroupId(),"rollBack".getBytes());
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                });
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
+
+
         if (myTransactional.isEnd() == true) {
             msg.setIsStartEnd("end");
             msg.setLocalId(zkLocalId + "end");
@@ -284,26 +315,34 @@ public class BussinessAspect implements Ordered {
             if (msg.getLocalState().equals("commit")) {
                 if (client.checkExists().forPath(pathZkGroupId) != null) {        //主节点没挂
                     if (new String(client.getData().forPath(pathZkGroupId)).equals("init")) {//并且是初始状态
+                        String localPre = myTransactional.isEnd() == true ? "end" :
+                                (myTransactional.isStart() == true ? "start" : "mid");
                         String curtPath = client.create()
                                 .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
-                                .forPath(pathZkGroupId + "/E", "commit".getBytes());//创建临时顺序节点
+                                .forPath(pathZkGroupId + "/ES", localPre.getBytes());//创建临时顺序节点
                         String nextPath = curtPath.substring(0, curtPath.length() - 10) + String.format("%010d", Integer.valueOf(curtPath.substring(curtPath.length() - 10, curtPath.length())) + 1);
-                        System.out.println(curtPath+" createTime: "+System.currentTimeMillis());
+                        System.out.println(curtPath+" createTime: "+new Date()+"  next: "+nextPath);
                         long start = System.currentTimeMillis();
-                        while (client.checkExists().forPath(nextPath) == null && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
-                            Thread.sleep((long) (Math.random() * 100));
+                        while (client.checkExists().forPath(nextPath) == null
+//                                && !hasState(pathZkGroupId,"end")
+                                && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
+//                            Thread.sleep((long) (Math.random() * 100));
                         }
 
                         if (client.checkExists().forPath(nextPath) == null) {       //最后一个节点改变主节点值
-                            System.out.println("endCost: " + (System.currentTimeMillis() - start));
-                            if(new String(client.getData().forPath(pathZkGroupId)).equals("init"))
+                            System.out.println(pathZkGroupId+"endCost: " + (System.currentTimeMillis() - start));
+                            if(new String(client.getData().forPath(pathZkGroupId)).equals("init")
+                                    && hasState(pathZkGroupId,"start")
+                                    && hasState(pathZkGroupId,"end"))
                                 client.setData().forPath(pathZkGroupId, "commit".getBytes());//设置提交
-                            if(new String(client.getData().forPath(pathZkGroupId)).equals("commit"))
+                            if(new String(client.getData().forPath(pathZkGroupId)).equals("commit")) {
                                 unlock(groupId, "commit");
-                            else
-                                unlock(groupId,"rollBack");
+                            } else {
+                                client.setData().forPath(pathZkGroupId, "rollBack".getBytes());//设置回滚
+                                unlock(groupId, "rollBack");
+                            }
                         } else {
-                            System.out.println("pntCost: " + (System.currentTimeMillis() - start));                       //中间节点监听主节点变化
+                            System.out.println(pathZkGroupId+"pntCost: " + (System.currentTimeMillis() - start));                       //中间节点监听主节点变化
                             NodeCache nodeCache = new NodeCache(client, pathZkGroupId);
                             nodeCache.start(true);
                             nodeCache.getListenable().addListener(() -> {
@@ -327,8 +366,7 @@ public class BussinessAspect implements Ordered {
                     System.out.println(groupId+" noGroupRoll..."+new Date());
                     unlock(groupId, "rollBack");
                 }
-            }
-            if (msg.getLocalState().equals("rollBack")) {//本地回滚，主节点也回滚
+            }else if (msg.getLocalState().equals("rollBack")) {//本地回滚，主节点也回滚
                 System.out.println(groupId+" localRoll..."+new Date());
                 unlock(groupId, "rollBack");
                 client.setData().forPath(pathZkGroupId, "rollBack".getBytes());
@@ -344,11 +382,32 @@ public class BussinessAspect implements Ordered {
         TxManager.tm.get(groupId).getLock().unlock();*/
         System.out.println(TxManager.tm.get(groupId).getCondition() + state + "end wait time..." + new Date()+groupId);
         TxManager.tm.get(groupId).getLatch().countDown();
+        //使用资源后释放资源
+        TxManager.tm.remove(groupId);
     }
 
     @Override
     public int getOrder() {
         return 10000;
     }
+
+    public boolean hasState(String path,String state){
+        boolean hasState = false;
+        try {
+            hasState = client.getChildren().forPath(path).stream().anyMatch(e -> {
+                boolean per = false;
+                try {
+                    per = new String(client.getData().forPath(path + "/" + e)).equals(state);
+                } catch (Exception e1) {
+                    e1.printStackTrace();
+                }
+                return per;
+            });
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return hasState;
+    }
+
 
 }

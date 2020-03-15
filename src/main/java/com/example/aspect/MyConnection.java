@@ -77,17 +77,17 @@ public class MyConnection implements Connection{
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    System.out.println("preCommit...");
+                    System.out.println(lockConditionUtil.getPathGroupId()+"preCommit...");
                     try {
                         if(lockConditionUtil.getState()==null){
                             connection.rollback();
-                            System.out.println("endRollBack...");
+                            System.out.println(lockConditionUtil.getPathGroupId()+"endRollBack...");
                         }else if (lockConditionUtil.getState().equals("commit")) {
                             connection.commit();
-                            System.out.println("endCommit...");
+                            System.out.println(lockConditionUtil.getPathGroupId()+"endCommit...");
                         }else {
                             connection.rollback();
-                            System.out.println("endRollBack...");
+                            System.out.println(lockConditionUtil.getPathGroupId()+"endRollBack...");
                         }
                     } catch (SQLException e) {
                         e.printStackTrace();
@@ -117,10 +117,10 @@ public class MyConnection implements Connection{
     @Override
     public void rollback() throws SQLException {
         System.out.println("isRollBack...");
-        System.out.println("preRollback...");
+        System.out.println(lockConditionUtil.getPathGroupId()+"preRollback...");
         this.connection.rollback();
         connection.close();
-        System.out.println("endRollback...");
+        System.out.println(lockConditionUtil.getPathGroupId()+"endRollback...");
     }
 
     @Override

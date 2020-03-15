@@ -74,10 +74,26 @@ public class Msg {
     }
 
     public static void main(String[] agrs){
+        ThreadLocal<String> threadLocal = new ThreadLocal<>();
         CountDownLatch countDownLatch = new CountDownLatch(2);
         System.out.println(String.format("%010d",12));
         String s = "123456789";
         System.out.println( s.substring(0,s.length()-5) + (Integer.valueOf(s.substring(s.length()-5,s.length()))+1));
+        new Thread(()->{
+            threadLocal.set("1...");
+            System.out.println("get: "+threadLocal.get());
+        }).start();
+        new Thread(()->{
+            threadLocal.set("2...");
+            System.out.println("get: "+threadLocal.get());
+        }).start();
+        threadLocal.set("main...");
+        System.out.println("get: "+threadLocal.get());
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
 
