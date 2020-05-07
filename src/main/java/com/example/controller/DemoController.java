@@ -3,16 +3,12 @@ package com.example.controller;
 import com.example.annotation.MyTransactional;
 import com.example.dao.DemoMapper;
 import com.example.entity.TxManager;
-import org.apache.curator.RetryPolicy;
+import com.example.service.ZookeeperService;
 import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.framework.recipes.cache.*;
-import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.data.Stat;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpRequest;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,14 +17,8 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
-
-import com.example.service.ZookeeperService;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 @RestController
 public class DemoController {
@@ -46,6 +36,9 @@ public class DemoController {
 
     @Autowired
     private ZookeeperService ZookeeperService;
+
+//    @Autowired
+//    private Demo2Service demo2Service;
 
     @RequestMapping("/creat")
     public void creat(){
@@ -71,10 +64,15 @@ public class DemoController {
 //    @Transactional
     @MyTransactional(isStart = true)
     @RequestMapping("/call")
-    public String call(String title, String author, Integer num1, Integer num2, String groupId){
+//    @LcnTransaction
+    public String call(String title, String author, Integer num1, Integer num2/*, String groupId*/){
         demoMapper.insertData("t3","a3");
         Thread ct = Thread.currentThread();
-        new Thread(()->{ String res = restTemplate.getForObject("http://localhost:8082/call?groupId={1}&title={2}&author={3}&num2={4}",String.class, TxManager.txGroup.get(ct),title,author,num2);}).start();
+//        new Thread(()->{ String res = restTemplate.getForObject("http://localhost:8082/call?groupId={1}&title={2}&author={3}&num2={4}",String.class, TxManager.txGroup.get(ct),title,author,num2);}).start();
+//        new Thread(()->{
+            String res = restTemplate.getForObject("http://localhost:8082/call?title={1}&author={2}&num2={3}",String.class, title,author,num2);
+//        }).start();
+//                demo2Service.call(groupId, title, author, num2);
         System.out.println("caculate: "+10/num1);
         return "sucessfully!";
     }

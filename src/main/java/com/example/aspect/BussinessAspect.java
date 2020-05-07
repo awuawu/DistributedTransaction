@@ -45,8 +45,13 @@ public class BussinessAspect implements Ordered {
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Method method = methodSignature.getMethod();
         MyTransactional myTransactional = method.getDeclaredAnnotation(MyTransactional.class);
+
+        //header获取groupId
+        msg.setGroupId(TxManager.txGroup.get(Thread.currentThread()));
+
+        //反射获取groupId
         //1.这里获取到所有的参数值的数组
-        Object[] args = joinPoint.getArgs();
+        /*Object[] args = joinPoint.getArgs();
         //2.最关键的一步:通过这获取到方法的所有参数名称的字符串数组
         String[] parameterNames = methodSignature.getParameterNames();
         int groupIdIndex = ArrayUtils.indexOf(parameterNames, "groupId");
@@ -58,7 +63,7 @@ public class BussinessAspect implements Ordered {
             }
         }else{
             throw new MyException("使用MyTransactional注解的方法需加参数groupId....");
-        }
+        }*/
 
 
         Thread ct = Thread.currentThread();
@@ -68,9 +73,9 @@ public class BussinessAspect implements Ordered {
 
             //模拟netty方式
             msg.setIsStartEnd("start");
-            String groupId = UUID.randomUUID().toString();
-            msg.setGroupId(groupId);
-            TxManager.txGroup.put(Thread.currentThread(), groupId);
+//            String groupId = UUID.randomUUID().toString();
+//            msg.setGroupId(groupId);
+            TxManager.txGroup.put(Thread.currentThread(), msg.getGroupId());
             CyclicBarrier cyclicBarrier = new CyclicBarrier(2);
             //zookeeper方式
             String zkGroupId = msg.getGroupId();
@@ -129,54 +134,6 @@ public class BussinessAspect implements Ordered {
             }).start();
             cyclicBarrier.await();
 
-            // 监听子节点事件
-            /*try {
-                TreeCache treeCache = new TreeCache(client, pathZkGroupId);
-                PathChildrenCache pathChildrenCache = new PathChildrenCache(client, pathZkGroupId, true);
-                treeCache.start();
-                pathChildrenCache.start();
-                long sleepTime = 40000l;
-                pathChildrenCache.getListenable().addListener(new PathChildrenCacheListener() {
-                    @Override
-                    public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
-                        ChildData eventData = event.getData();
-                        switch (event.getType()) {
-                            case CHILD_ADDED:
-                                String zkLocalId = new String(eventData.getData());
-                                System.out.println("/" + zkGroupId + "节点添加" + eventData.getPath() + "\t添加数据为：" + zkLocalId);
-                                if (eventData.getPath().endsWith("end")) {
-                                    Map<String, ChildData> currentChildren = treeCache.getCurrentChildren(pathZkGroupId);
-                                    long start = System.currentTimeMillis();
-                                    while (isAnyInit(pathZkGroupId)//有子节点处于刚创建状态
-                                            && (System.currentTimeMillis()-start < sleepTime));//等待时间未超时
-                                    System.out.println("castTime: "+(System.currentTimeMillis()-start));
-                                    boolean isCommit = isAllCommit(pathZkGroupId);
-                                    System.out.println("groupState: "+isCommit);
-                                    System.out.println("groupData: "+new String(client.getData().forPath(pathZkGroupId)));
-                                    if (isCommit && getData(pathZkGroupId).equals("init")) {
-                                        System.out.println("setCommit...");
-                                        setData(pathZkGroupId,"commit");
-                                    } else {
-                                        System.out.println("setRollBack...");
-                                        setData(pathZkGroupId,"rollBack");
-                                    }
-                                }
-                                break;
-                            case CONNECTION_LOST:
-                                System.out.println(eventData.getPath() + "节点被删除");
-                                if(getData(pathZkGroupId)!=null&&getData(pathZkGroupId).equals("init")) {
-                                    setData(pathZkGroupId,"rollBack");
-                                }
-                                break;
-                            default:
-                                break;
-                        }
-                    }
-                });
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }*/
         }else{
             try {
                 PathChildrenCache pathChildrenCache = new PathChildrenCache(client, "/"+msg.getGroupId(), true);
@@ -217,160 +174,81 @@ public class BussinessAspect implements Ordered {
         String pathZkLocalId = pathZkGroupId + "/" + msg.getLocalId();
         TxManager.tm.get(groupId).setPathGroupId(pathZkGroupId);
 
-        /*try {
-            if(client.checkExists().forPath(pathZkGroupId)!=null) {
-                client.create() // 非递归创建所需父节点，必须要有事务组
-                        .withMode(CreateMode.EPHEMERAL) // 创建类型为临时节点
-                        .forPath(pathZkLocalId, "init".getBytes()); // zkGroupId作为父节点，状态初始为init
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
-
-        //监听父节点，看父节点状态变化
-        /*try {
-            NodeCache nodeCache = new NodeCache(client, pathZkGroupId);
-            nodeCache.start(true);
-            nodeCache.getListenable().addListener(new NodeCacheListener() {
-                @Override
-                public void nodeChanged() throws Exception {
-                    ChildData eventData = nodeCache.getCurrentData();
-                    if(eventData == null){
-                        System.out.println("groupId removed: "+pathZkGroupId);
-                        TxManager.tm.get(groupId).setState("rollBack");
-                        System.out.println("unlock...");
-                        TxManager.tm.get(groupId).getLock().lock();
-                        TxManager.tm.get(groupId).getCondition().signalAll();
-                        TxManager.tm.get(groupId).getLock().unlock();
-                    }else{
-                        String zkGroupState = new String(eventData.getData());
-                        int version = eventData.getStat().getVersion();
-                        System.out.println("changedTimes: " +zkGroupState+version);
-                        if (zkGroupState.equals("commit") && version == 1) {
-                            TxManager.tm.get(groupId).setState("commit");
-                            System.out.println("commitunlock...");
-                            System.out.println("unlockThread: "+ct.getId());
-                            TxManager.tm.get(groupId).getLock().lock();
-                            System.out.println(TxManager.tm.get(groupId).getCondition()+"end wait time..."+new Date());
-                            TxManager.tm.get(groupId).getCondition().signalAll();
-                            TxManager.tm.get(groupId).getLock().unlock();
-                        }else if(zkGroupState.equals("rollBack") && version == 1){
-                            TxManager.tm.get(groupId).setState("rollBack");
-                            System.out.println("rollBackunlock...");
-                            System.out.println("unlockThread: "+ct.getId());
-                            TxManager.tm.get(groupId).getLock().lock();
-                            System.out.println(TxManager.tm.get(groupId).getCondition()+"end wait time..."+new Date());
-                            TxManager.tm.get(groupId).getCondition().signalAll();
-                            TxManager.tm.get(groupId).getLock().unlock();
-                        }else if(version==eventData.getStat().getNumChildren()+1&&myTransactional.isStart()==true){
-                            try {
-                                client.delete().guaranteed().deletingChildrenIfNeeded().forPath(pathZkGroupId);
-                            }catch (Exception e){
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }
-            });
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }*/
 
         // 原本数据库的逻辑
         try {
             joinPoint.proceed();
             msg.setLocalState("commit");
-//            long startc = System.currentTimeMillis();
-//            while(client.checkExists().forPath(pathZkLocalId)!=null&&(System.currentTimeMillis()-startc<100));
-//            client.setData().forPath(pathZkLocalId,msg.getLocalState().getBytes());
 
         } catch (Throwable throwable) {
             msg.setLocalState("rollBack");
-//            try {
-//                long startr = System.currentTimeMillis();
-//                while(client.checkExists().forPath(pathZkLocalId)!=null&&(System.currentTimeMillis()-startr<100));
-//                client.setData().forPath(pathZkLocalId,msg.getLocalState().getBytes());
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
-//            throwable.printStackTrace();
         } finally {
-            // 非事务开启者获取事务组ID
-
-//            while (TxManager.tm.get(ct).getState()==null&&(System.currentTimeMillis()-start)<60000l);
-//            TxManager.tm.get(ct).getLock().lock();
-//            TxManager.tm.get(ct).getCondition().signalAll();
-//            TxManager.tm.get(ct).getLock().unlock();
-            // 模拟netty方式
-            /*System.out.println("wait res...");
-            Msg res = restTemplate.postForObject("http://localhost:8083/manager", msg, Msg.class);
-            System.out.println("resMessage: "+res);
-            System.out.println("bussinessThread: "+Thread.currentThread());
-            TxManager.tm.get(Thread.currentThread()).setState(res.getGroupState());
-            TxManager.tm.get(Thread.currentThread()).getLock().lock();
-            TxManager.tm.get(Thread.currentThread()).getCondition().signalAll();
-            TxManager.tm.get(Thread.currentThread()).getLock().unlock();*/
-
-            if (msg.getLocalState().equals("commit")) {
-                if (client.checkExists().forPath(pathZkGroupId) != null) {        //主节点没挂
-                    if (new String(client.getData().forPath(pathZkGroupId)).equals("init")) {//并且是初始状态
-                        String localPre = myTransactional.isEnd() == true ? "end" :
-                                (myTransactional.isStart() == true ? "start" : "mid");
-                        String curtPath = client.create()
-                                .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
-                                .forPath(pathZkGroupId + "/ES", localPre.getBytes());//创建临时顺序节点
-                        String nextPath = curtPath.substring(0, curtPath.length() - 10) + String.format("%010d", Integer.valueOf(curtPath.substring(curtPath.length() - 10, curtPath.length())) + 1);
-                        System.out.println(curtPath+" createTime: "+new Date()+"  next: "+nextPath);
-                        long start = System.currentTimeMillis();
-                        while (client.checkExists().forPath(nextPath) == null
-//                                && !hasState(pathZkGroupId,"end")
-                                && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
+            new Thread(()->{
+                try {
+                    if (msg.getLocalState().equals("commit")) {
+                        if (client.checkExists().forPath(pathZkGroupId) != null) {        //主节点没挂
+                            if (new String(client.getData().forPath(pathZkGroupId)).equals("init")) {//并且是初始状态
+                                String localPre = myTransactional.isEnd() == true ? "end" :
+                                        (myTransactional.isStart() == true ? "start" : "mid");
+                                String curtPath = client.create()
+                                        .withMode(CreateMode.EPHEMERAL_SEQUENTIAL)
+                                        .forPath(pathZkGroupId + "/ES", localPre.getBytes());//创建临时顺序节点
+                                String nextPath = curtPath.substring(0, curtPath.length() - 10) + String.format("%010d", Integer.valueOf(curtPath.substring(curtPath.length() - 10, curtPath.length())) + 1);
+                                System.out.println(curtPath + " createTime: " + new Date() + "  next: " + nextPath);
+                                long start = System.currentTimeMillis();
+                                while (client.checkExists().forPath(nextPath) == null
+//                                    && !(hasState(pathZkGroupId,"end") && hasState(pathZkGroupId,"start"))//基本全部节点都到了
+                                        && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
 //                            Thread.sleep((long) (Math.random() * 100));
-                        }
+                                }
 
-                        if (client.checkExists().forPath(nextPath) == null) {       //最后一个节点改变主节点值
-                            System.out.println(pathZkGroupId+"endCost: " + (System.currentTimeMillis() - start));
-                            if(new String(client.getData().forPath(pathZkGroupId)).equals("init")
-                                    && hasState(pathZkGroupId,"start")
-                                    && hasState(pathZkGroupId,"end"))
-                                client.setData().forPath(pathZkGroupId, "commit".getBytes());//设置提交
-                            if(new String(client.getData().forPath(pathZkGroupId)).equals("commit")) {
-                                unlock(groupId, "commit");
-                            } else {
-                                client.setData().forPath(pathZkGroupId, "rollBack".getBytes());//设置回滚
+                                if (client.checkExists().forPath(nextPath) == null) {       //最后一个节点改变主节点值
+                                    System.out.println(pathZkGroupId + "endCost: " + (System.currentTimeMillis() - start));
+                                    if (new String(client.getData().forPath(pathZkGroupId)).equals("init")
+                                            && hasState(pathZkGroupId, "start")
+                                            && hasState(pathZkGroupId, "end"))
+                                        client.setData().forPath(pathZkGroupId, "commit".getBytes());//设置提交
+                                    if (new String(client.getData().forPath(pathZkGroupId)).equals("commit")) {
+                                        unlock(groupId, "commit");
+                                    } else {
+                                        client.setData().forPath(pathZkGroupId, "rollBack".getBytes());//设置回滚
+                                        unlock(groupId, "rollBack");
+                                    }
+                                } else {
+                                    System.out.println(pathZkGroupId + "pntCost: " + (System.currentTimeMillis() - start));                       //中间节点监听主节点变化
+                                    NodeCache nodeCache = new NodeCache(client, pathZkGroupId);
+                                    nodeCache.start(true);
+                                    nodeCache.getListenable().addListener(() -> {
+                                        ChildData eventData = nodeCache.getCurrentData();
+                                        String zkGroupState = new String(eventData.getData());
+                                        int version = eventData.getStat().getVersion();
+                                        if (zkGroupState.equals("commit")) {
+                                            System.out.println(groupId + " notifyCommit..." + new Date());
+                                            unlock(groupId, "commit");
+                                        } else if (zkGroupState.equals("rollBack")) {
+                                            System.out.println(groupId + " notifyRoll..." + new Date());
+                                            unlock(groupId, "rollBack");
+                                        }
+                                    });
+                                }
+                            } else if (new String(client.getData().forPath(pathZkGroupId)).equals("rollBack")) {  //提前被其他系统改成了回滚
+                                System.out.println(groupId + " anyRoll..." + new Date());
                                 unlock(groupId, "rollBack");
                             }
-                        } else {
-                            System.out.println(pathZkGroupId+"pntCost: " + (System.currentTimeMillis() - start));                       //中间节点监听主节点变化
-                            NodeCache nodeCache = new NodeCache(client, pathZkGroupId);
-                            nodeCache.start(true);
-                            nodeCache.getListenable().addListener(() -> {
-                                ChildData eventData = nodeCache.getCurrentData();
-                                String zkGroupState = new String(eventData.getData());
-                                int version = eventData.getStat().getVersion();
-                                if (zkGroupState.equals("commit")) {
-                                    System.out.println(groupId+ " notifyCommit..."+new Date());
-                                    unlock(groupId, "commit");
-                                } else if (zkGroupState.equals("rollBack")) {
-                                    System.out.println(groupId+ " notifyRoll..."+new Date());
-                                    unlock(groupId, "rollBack");
-                                }
-                            });
+                        } else { // 主节点挂了回滚
+                            System.out.println(groupId + " noGroupRoll..." + new Date());
+                            unlock(groupId, "rollBack");
                         }
-                    } else if (new String(client.getData().forPath(pathZkGroupId)).equals("rollBack")) {  //提前被其他系统改成了回滚
-                        System.out.println(groupId+" anyRoll..."+new Date());
+                    } else if (msg.getLocalState().equals("rollBack")) {//本地回滚，主节点也回滚
+                        System.out.println(groupId + " localRoll..." + new Date());
                         unlock(groupId, "rollBack");
+                        client.setData().forPath(pathZkGroupId, "rollBack".getBytes());
                     }
-                } else { // 主节点挂了回滚
-                    System.out.println(groupId+" noGroupRoll..."+new Date());
-                    unlock(groupId, "rollBack");
+                }catch (Exception e){
+                    e.printStackTrace();
                 }
-            }else if (msg.getLocalState().equals("rollBack")) {//本地回滚，主节点也回滚
-                System.out.println(groupId+" localRoll..."+new Date());
-                unlock(groupId, "rollBack");
-                client.setData().forPath(pathZkGroupId, "rollBack".getBytes());
-            }
+            }).start();
+
         }
     }
 

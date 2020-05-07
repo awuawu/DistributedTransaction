@@ -3,7 +3,9 @@ package com.example.entity;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.springframework.util.Base64Utils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -71,6 +73,20 @@ public class Msg {
 
     public void setIsStartEnd(String isStartEnd) {
         this.isStartEnd = isStartEnd;
+    }
+
+
+    /**
+     * Tracing信息设置器
+     */
+    public interface TracingSetter {
+        /**
+         * 设置tracing属性
+         *
+         * @param key   key
+         * @param value value
+         */
+        void set(String key, String value);
     }
 
     public static void main(String[] agrs){
