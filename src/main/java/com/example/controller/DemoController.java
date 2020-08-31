@@ -69,9 +69,9 @@ public class DemoController {
         demoMapper.insertData("t3","a3");
         Thread ct = Thread.currentThread();
 //        new Thread(()->{ String res = restTemplate.getForObject("http://localhost:8082/call?groupId={1}&title={2}&author={3}&num2={4}",String.class, TxManager.txGroup.get(ct),title,author,num2);}).start();
-//        new Thread(()->{
+        new Thread(()->{
             String res = restTemplate.getForObject("http://localhost:8082/call?title={1}&author={2}&num2={3}",String.class, title,author,num2);
-//        }).start();
+        }).start();
 //                demo2Service.call(groupId, title, author, num2);
         System.out.println("caculate: "+10/num1);
         return "sucessfully!";

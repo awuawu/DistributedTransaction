@@ -1,9 +1,6 @@
 package com.example.config;
 
 import com.example.entity.TxManager;
-import org.apache.curator.framework.CuratorFramework;
-import org.apache.curator.framework.recipes.cache.*;
-import org.apache.zookeeper.CreateMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.stereotype.Component;
@@ -27,16 +24,15 @@ import java.util.UUID;
 public class SpringTracingApplier implements HandlerInterceptor, WebMvcConfigurer {
     @Autowired
     private RestTemplate restTemplate;
-    @Autowired
-    private CuratorFramework client;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String groupId = request.getHeader("groupId");//获取groupId
-        if(groupId == null){//事务发起者新生成groupId记录下来放置header并且创建事务组节点
+        if(groupId == null){//事务发起者新生成groupId
             groupId = UUID.randomUUID().toString();
         }
-        TxManager.txGroup.put(Thread.currentThread(), groupId);//保存groupId
+//        TxManager.txGroup.put(Thread.currentThread(), groupId);//保存groupId
+        TxManager.deliverGroup.set(groupId);
         return true;
     }
 

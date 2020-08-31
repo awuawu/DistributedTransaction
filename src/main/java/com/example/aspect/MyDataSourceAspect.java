@@ -21,7 +21,8 @@ public class MyDataSourceAspect {
         try {
             connection = (Connection) joinPoint.proceed();
             connection.setAutoCommit(false);
-            connection = new MyConnection(connection, TxManager.tm.get(TxManager.txGroup.get(Thread.currentThread())));
+//            connection = new MyConnection(connection, TxManager.tm.get(TxManager.txGroup.get(Thread.currentThread())));
+            connection = new MyConnection(connection, TxManager.tm.get(TxManager.deliverGroup.get()));
         } catch (Throwable throwable) {
             throwable.printStackTrace();
         }

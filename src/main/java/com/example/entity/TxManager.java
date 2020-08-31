@@ -9,4 +9,5 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TxManager {
     public static Map<String, LockConditionUtil> tm = new ConcurrentHashMap<>(1000);
     public static Map<Thread, String> txGroup = new ConcurrentHashMap<>(1000);
+    public static InheritableThreadLocal<String> deliverGroup = new InheritableThreadLocal<>();
 }

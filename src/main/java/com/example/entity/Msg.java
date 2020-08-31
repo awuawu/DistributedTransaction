@@ -110,6 +110,15 @@ public class Msg {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        int[] num=new int[]{2,5,7,9,11,12};
+        System.out.println(isContain(num,0,5,23));
+    }
+
+    public static boolean isContain(int[] num,int s,int e,int r){
+        if(s==e){
+            return num[s]==r;
+        }
+        return isContain(num,s+1,e,r-num[s])||isContain(num,s+1,e,r);
     }
 
 

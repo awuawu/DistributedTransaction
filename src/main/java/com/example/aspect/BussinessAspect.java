@@ -47,8 +47,8 @@ public class BussinessAspect implements Ordered {
         MyTransactional myTransactional = method.getDeclaredAnnotation(MyTransactional.class);
 
         //header获取groupId
-        msg.setGroupId(TxManager.txGroup.get(Thread.currentThread()));
-
+//        msg.setGroupId(TxManager.txGroup.get(Thread.currentThread()));
+        msg.setGroupId(TxManager.deliverGroup.get());
         //反射获取groupId
         //1.这里获取到所有的参数值的数组
         /*Object[] args = joinPoint.getArgs();
@@ -197,7 +197,7 @@ public class BussinessAspect implements Ordered {
                                 System.out.println(curtPath + " createTime: " + new Date() + "  next: " + nextPath);
                                 long start = System.currentTimeMillis();
                                 while (client.checkExists().forPath(nextPath) == null
-                                    && !(hasState(pathZkGroupId,"end") && hasState(pathZkGroupId,"start"))//基本全部节点都到了
+//                                    && !(hasState(pathZkGroupId,"end") && hasState(pathZkGroupId,"start"))//基本全部节点都到了
                                         && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
 //                            Thread.sleep((long) (Math.random() * 100));
                                 }

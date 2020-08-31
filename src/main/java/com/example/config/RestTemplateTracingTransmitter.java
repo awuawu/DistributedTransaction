@@ -43,18 +43,11 @@ public class RestTemplateTracingTransmitter implements ClientHttpRequestIntercep
     public ClientHttpResponse intercept(
             @NonNull HttpRequest httpRequest, @NonNull byte[] bytes,
             @NonNull ClientHttpRequestExecution clientHttpRequestExecution) throws IOException {
-        String groupId = TxManager.txGroup.get(Thread.currentThread());
+//        String groupId = TxManager.txGroup.get(Thread.currentThread());
+        String groupId = TxManager.deliverGroup.get();
         if(groupId != null){
             httpRequest.getHeaders().add("groupId", groupId);
         }
         return clientHttpRequestExecution.execute(httpRequest, bytes);
-    }
-
-    public static void main(String[] agrs){
-        ThreadLocal<String> local = new ThreadLocal<>();
-        local.set("hhaha");
-        new Thread(()->{
-            System.out.println("sun: "+local.get());}).start();
-        System.out.println("father: "+local.get());
     }
 }
