@@ -17,4 +17,8 @@
         INSERT INTO demo (demo_title,demo_author) VALUES (#{title},#{author});
     </insert>
 
+    <insert id="insertDataSeri">
+        INSERT INTO demo (demo_title,demo_author) VALUES (#{title},#{author});
+    </insert>
+
 </mapper>

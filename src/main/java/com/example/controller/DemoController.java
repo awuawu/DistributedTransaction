@@ -62,7 +62,7 @@ public class DemoController {
     }
 
 //    @Transactional
-    @MyTransactional(isStart = true)
+    @MyTransactional(isStart = true,childNum = 2)
     @RequestMapping("/call")
 //    @LcnTransaction
     public String call(String title, String author, Integer num1, Integer num2/*, String groupId*/){

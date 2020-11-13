@@ -47,6 +47,7 @@ public class RestTemplateTracingTransmitter implements ClientHttpRequestIntercep
         String groupId = TxManager.deliverGroup.get();
         if(groupId != null){
             httpRequest.getHeaders().add("groupId", groupId);
+            System.out.println("请求下游放置groupId: "+groupId);
         }
         return clientHttpRequestExecution.execute(httpRequest, bytes);
     }

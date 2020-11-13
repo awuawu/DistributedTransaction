@@ -27,10 +27,16 @@ public class SpringTracingApplier implements HandlerInterceptor, WebMvcConfigure
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        String groupId = request.getHeader("groupId");//获取groupId
+        String groupId = request.getHeader("groupId");//从请求中获取groupId
+        System.out.println("请求： "+request);
+        if(groupId != null){
+            System.out.println("下游从上游得到groupId: "+groupId);
+        }
         if(groupId == null){//事务发起者新生成groupId
             groupId = UUID.randomUUID().toString();
+            System.out.println("new transaction: "+groupId);
         }
+
 //        TxManager.txGroup.put(Thread.currentThread(), groupId);//保存groupId
         TxManager.deliverGroup.set(groupId);
         return true;

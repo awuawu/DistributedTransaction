@@ -45,39 +45,19 @@ public class BussinessAspect implements Ordered {
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Method method = methodSignature.getMethod();
         MyTransactional myTransactional = method.getDeclaredAnnotation(MyTransactional.class);
-
+        int childNum = myTransactional.childNum();
         //header获取groupId
 //        msg.setGroupId(TxManager.txGroup.get(Thread.currentThread()));
         msg.setGroupId(TxManager.deliverGroup.get());
-        //反射获取groupId
-        //1.这里获取到所有的参数值的数组
-        /*Object[] args = joinPoint.getArgs();
-        //2.最关键的一步:通过这获取到方法的所有参数名称的字符串数组
-        String[] parameterNames = methodSignature.getParameterNames();
-        int groupIdIndex = ArrayUtils.indexOf(parameterNames, "groupId");
-        if (groupIdIndex != -1) {
-            String groupId = (String) args[groupIdIndex];
-            if(groupId != null){ //非事务发起者设置groupId
-                msg.setGroupId(groupId);
-                TxManager.txGroup.put(Thread.currentThread(), groupId);
-            }
-        }else{
-            throw new MyException("使用MyTransactional注解的方法需加参数groupId....");
-        }*/
 
 
         Thread ct = Thread.currentThread();
         String zkLocalId = UUID.randomUUID().toString();
 
         if (myTransactional.isStart() == true) {
-
-            //模拟netty方式
             msg.setIsStartEnd("start");
-//            String groupId = UUID.randomUUID().toString();
-//            msg.setGroupId(groupId);
             TxManager.txGroup.put(Thread.currentThread(), msg.getGroupId());
             CyclicBarrier cyclicBarrier = new CyclicBarrier(2);
-            //zookeeper方式
             String zkGroupId = msg.getGroupId();
             String pathZkGroupId = "/" + zkGroupId;
 
@@ -101,7 +81,7 @@ public class BussinessAspect implements Ordered {
                         public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
                             ChildData eventData = event.getData();
                             switch (event.getType()) {
-                                case CHILD_REMOVED:
+                                case CHILD_REMOVED://子节点失联
                                     System.out.println(eventData.getPath() + "节点被删除......");
                                     if(new String(client.getData().forPath(pathZkGroupId)).equals("init"))
                                         client.setData().forPath(pathZkGroupId,"rollBack".getBytes());
@@ -123,14 +103,7 @@ public class BussinessAspect implements Ordered {
                 } catch (BrokenBarrierException e) {
                     e.printStackTrace();
                 }
-                try {   //两分钟后删除主节点
-                    if (client.checkExists().forPath(pathZkGroupId) != null
-                            && !new String(client.getData().forPath(pathZkGroupId)).equals("init")) {
-                        client.delete().guaranteed().deletingChildrenIfNeeded().forPath(pathZkGroupId);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
+                deleteNodes(pathZkGroupId);
             }).start();
             cyclicBarrier.await();
 
@@ -143,7 +116,7 @@ public class BussinessAspect implements Ordered {
                     public void childEvent(CuratorFramework client, PathChildrenCacheEvent event) throws Exception {
                         ChildData eventData = event.getData();
                         switch (event.getType()) {
-                            case CHILD_REMOVED:
+                            case CHILD_REMOVED://子节点失联
                                 System.out.println(eventData.getPath() + "节点被删除......");
                                 if(new String(client.getData().forPath("/"+msg.getGroupId())).equals("init"))
                                     client.setData().forPath("/"+msg.getGroupId(),"rollBack".getBytes());
@@ -198,15 +171,16 @@ public class BussinessAspect implements Ordered {
                                 long start = System.currentTimeMillis();
                                 while (client.checkExists().forPath(nextPath) == null
 //                                    && !(hasState(pathZkGroupId,"end") && hasState(pathZkGroupId,"start"))//基本全部节点都到了
-                                        && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
-//                            Thread.sleep((long) (Math.random() * 100));
+                                        && childNum == caculateNum(pathZkGroupId)//节点还没到完
+                                            && System.currentTimeMillis() - start < 1000 * 9) {//等下一个节点创建最多等9s
                                 }
 
                                 if (client.checkExists().forPath(nextPath) == null) {       //最后一个节点改变主节点值
                                     System.out.println(pathZkGroupId + "endCost: " + (System.currentTimeMillis() - start));
                                     if (new String(client.getData().forPath(pathZkGroupId)).equals("init")
                                             && hasState(pathZkGroupId, "start")
-                                            && hasState(pathZkGroupId, "end"))
+                                            && hasState(pathZkGroupId, "end")
+                                            && childNum == caculateNum(pathZkGroupId))
                                         client.setData().forPath(pathZkGroupId, "commit".getBytes());//设置提交
                                     if (new String(client.getData().forPath(pathZkGroupId)).equals("commit")) {
                                         unlock(groupId, "commit");
@@ -254,10 +228,6 @@ public class BussinessAspect implements Ordered {
 
     private void unlock(String groupId, String state) {
         TxManager.tm.get(groupId).setState(state);
-        /*TxManager.tm.get(groupId).getLock().lock();
-        System.out.println(TxManager.tm.get(groupId).getCondition()+ state + "end wait time..." + new Date());
-        TxManager.tm.get(groupId).getCondition().signalAll();
-        TxManager.tm.get(groupId).getLock().unlock();*/
         System.out.println(TxManager.tm.get(groupId).getCondition() + state + "end wait time..." + new Date()+groupId);
         TxManager.tm.get(groupId).getLatch().countDown();
         //使用资源后释放资源
@@ -287,5 +257,24 @@ public class BussinessAspect implements Ordered {
         return hasState;
     }
 
+    public int caculateNum(String path){
+        try {
+            return client.getChildren().forPath(path).size();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return 0;
+    }
+
+    public void deleteNodes(String path){
+        try {   //两分钟后删除主节点
+            if (client.checkExists().forPath(path) != null
+                    && !new String(client.getData().forPath(path)).equals("init")) {
+                client.delete().guaranteed().deletingChildrenIfNeeded().forPath(path);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
 }

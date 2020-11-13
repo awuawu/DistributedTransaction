@@ -13,4 +13,5 @@ import java.lang.annotation.Target;
 public @interface MyTransactional {
     boolean isStart() default false;
     boolean isEnd() default false;
+    int childNum() default 2;
 }

@@ -9,7 +9,8 @@ public class Tracings {
      * @param tracingSetter Tracing信息设置器
      */
     public static void transmit(TracingSetter tracingSetter) {
-        String groupId = (String) TxManager.txGroup.get(Thread.currentThread());
+//        String groupId = (String) TxManager.txGroup.get(Thread.currentThread());
+        String groupId = TxManager.deliverGroup.get();
         if (groupId != null) {
             tracingSetter.set("groupId", groupId);
         }
