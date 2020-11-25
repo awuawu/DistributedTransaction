@@ -35,14 +35,26 @@ public class SumTask extends RecursiveTask<Integer> {
     }
 
     public static void main(String[] args) {
-        SumTask sumTask = new SumTask(1, 999999999);
-
+//        SumTask sumTask = new SumTask(1, 999999999);
+//
+//        long s1 = System.nanoTime();
+//        System.out.println("result:" + sumTask.fork().join()+" cost time "+(System.nanoTime()-s1));
+//
+//        long s2 = System.nanoTime();
+//        ForkJoinPool forkJoinPool=new ForkJoinPool(2);
+//        forkJoinPool.submit(sumTask);
+//        System.out.println("result:" + sumTask.join()+" cost time "+(System.nanoTime()-s2));
+        int[] arr = new int[1000001];
         long s1 = System.nanoTime();
-        System.out.println("result:" + sumTask.fork().join()+" cost time "+(System.nanoTime()-s1));
+        System.out.println(arr[0]);
+        System.out.println("cost: "+(System.nanoTime()-s1));
 
         long s2 = System.nanoTime();
-        ForkJoinPool forkJoinPool=new ForkJoinPool(2);
-        forkJoinPool.submit(sumTask);
-        System.out.println("result:" + sumTask.join()+" cost time "+(System.nanoTime()-s2));
+        System.out.println(arr[0]);
+        System.out.println("cost: "+(System.nanoTime()-s2));
+
+        long s3 = System.nanoTime();
+        System.out.println(arr[1000000]);
+        System.out.println("cost: "+(System.nanoTime()-s3));
     }
 }

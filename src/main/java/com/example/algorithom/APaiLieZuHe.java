@@ -95,13 +95,14 @@ public class APaiLieZuHe {
     private static List<List<Integer>> wrap(List<List<Integer>> allPaiLie, int num) {
         List<List<Integer>> res = new ArrayList<>();
         for (int i = 0; i < allPaiLie.size(); i++) {
-            for (int j = 0; j <= allPaiLie.get(i).size(); j++) {
+            for (int j = 0; j < allPaiLie.get(i).size(); j++) {
                 List<Integer> temp = new ArrayList<>();
-                for (int k = 0; k < allPaiLie.get(i).size(); k++) {
-                    if(j==k)
+                for (int k = allPaiLie.get(i).size()-1; k > 0; k--) {
+                    if(k==allPaiLie.get(i).size()-1&&j==allPaiLie.get(i).size()) {
                         temp.add(num);
+                    }
                     temp.add(allPaiLie.get(i).get(k));
-                    if(k==allPaiLie.get(i).size()-1&&j==allPaiLie.get(i).size())
+                    if(j==k)
                         temp.add(num);
                 }
                 res.add(temp);
@@ -114,19 +115,20 @@ public class APaiLieZuHe {
 //        System.out.println(fun2(4,4));
 //        System.out.println(funN(new int[]{2,1,1,1},3));
         List<List<Integer>> list = Arrays.asList(
-                Arrays.asList(new Integer[]{1,3,4}),
-                Arrays.asList(new Integer[]{3,1,4}),
-                Arrays.asList(new Integer[]{3,4,1}));
-//        List<List<Integer>> res = wrap(list,3);
+                Arrays.asList(new Integer[]{1,2}),
+                Arrays.asList(new Integer[]{2,1}));
+//                Arrays.asList(new Integer[]{3,4,1}));
+        List<List<Integer>> res = wrap(list,3);
 //        List<List<Integer>> res = allPaiLie(new int[]{1,2,3,4},3);
+        System.out.println("sdkhcjs");
 //        List<List<Integer>> res = wrapTx(list,new int[]{1,2},1);
 //        List<List<Integer>> res = pailie2(new int[]{1,2},new int[]{3,4,5},1);
 
 //        List<List<Integer>> res = wrapN(list,new int[]{5,6});
-        List<List<Integer>> res = pailieN(new int[][]{
-                {1,2,3},
-                {4,5,6},
-                {7,8,9}
-        },2);
+//        List<List<Integer>> res = pailieN(new int[][]{
+//                {1,2,3},
+//                {4,5,6},
+//                {7,8,9}
+//        },2);
      }
 }

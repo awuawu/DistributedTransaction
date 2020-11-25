@@ -13,12 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.util.UUID;
 
-/**
- * Description:
- * Date: 19-1-28 下午4:59
- *
- * @author ujued
- */
+//拦截器收到groupId时放置groupId,没收到生成
 @ConditionalOnClass(HandlerInterceptor.class)
 @Component
 public class SpringTracingApplier implements HandlerInterceptor, WebMvcConfigurer {

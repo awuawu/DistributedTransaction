@@ -1,5 +1,12 @@
 package com.example.algorithom;
-
+//2,2,1,1,3,4,3,5 nums[]
+//res[]
+//for(nums){
+// res[num[i]]++;
+// }
+//for(res)
+//res[i]==1
+//return i;
 public class Haha {
     //找出相同字符长度的最大值，aba
     public static int fun(String str){

@@ -2,6 +2,7 @@ package com.example.config;
 
 import com.example.entity.TxManager;
 
+//feign调用放置groupId
 public class Tracings {
     /**
      * 传输Tracing信息

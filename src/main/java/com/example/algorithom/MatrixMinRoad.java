@@ -102,5 +102,7 @@ class MatrixMinRoad {
 
         long s3 = System.nanoTime();
         System.out.println(caculateDP(grid)+" cost "+(System.nanoTime()-s3));
+
+
     }
 }

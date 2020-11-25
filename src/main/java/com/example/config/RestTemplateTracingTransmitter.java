@@ -17,12 +17,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Description:
- * Date: 19-1-28 下午4:35
- *
- * @author ujued
- */
+
+//RestTemplate调用时传输groupId
 @ConditionalOnClass(RestTemplate.class)
 @Component
 @Order

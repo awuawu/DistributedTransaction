@@ -7,12 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Description:
- * Date: 19-1-28 下午3:47
- *
- * @author ujued
- */
+//feign调用时传输groupId
 @ConditionalOnClass(Feign.class)
 @Component
 @Order

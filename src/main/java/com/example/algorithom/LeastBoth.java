@@ -1,5 +1,9 @@
 package com.example.algorithom;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public class LeastBoth {
     static class TreeNode{
         TreeNode left;
@@ -11,6 +15,53 @@ public class LeastBoth {
             this.data = data;
         }
     }
+    public static List<List<Integer>> levelTree(TreeNode root){
+        if(root==null)
+            return null;
+        return wrap(root.data,levelTree(root.left),levelTree(root.right));
+    }
+
+    private static List<List<Integer>> wrap(int data, List<List<Integer>> left, List<List<Integer>> right) {
+        List<List<Integer>> res = new ArrayList<>();
+        List<Integer> root = Arrays.asList(data);
+        res.add(root);
+        if(left==null&&right==null)
+            return res;
+        if(left==null) {
+            res.addAll(right);
+            return res;
+        }
+        if(right==null) {
+            res.addAll(left);
+            return res;
+        }
+        int i = 0;
+        for (; i < left.size() && i < right.size();) {
+            List<Integer> temp = new ArrayList<>();
+            for (int j = 0; j < left.get(i).size(); j++) {
+                temp.add(left.get(i).get(j));
+            }
+            for (int k = 0; k < right.get(i).size(); k++) {
+                temp.add(right.get(i).get(k));
+            }
+            res.add(temp);
+            i++;
+        }
+        if(left.size()==right.size())
+            return res;
+        if(left.size()>right.size()){
+            for (int m = i; m < left.size(); m++) {
+                res.add(left.get(m));
+            }
+        }
+        if(left.size()<right.size()){
+            for (int m = i; m < right.size(); m++) {
+                res.add(right.get(m));
+            }
+        }
+        return res;
+    }
+
     public static boolean isContain(TreeNode root,TreeNode node){
         boolean isLeft = false;boolean isRight = false;
         if(root.data==node.data)
@@ -58,9 +109,20 @@ public class LeastBoth {
         return null;
     }
 
+    public static void print(List<List<Integer>> list){
+        if(list==null||list.size()==0)
+            return;
+        for (int i = 0; i < list.size(); i++) {
+            for (int j = 0; j < list.get(i).size(); j++) {
+                System.out.print(list.get(i).get(j)+" ");
+            }
+            System.out.println();
+        }
+    }
+
 
     public static void main(String[] args) {
-        TreeNode n10 = new TreeNode(null,null,8);
+        TreeNode n10 = new TreeNode(null,null,10);
         TreeNode n8 = new TreeNode(null,null,8);
         TreeNode n9 = new TreeNode(null,null,9);
         TreeNode n6 = new TreeNode(n8,null,6);
@@ -70,7 +132,22 @@ public class LeastBoth {
         TreeNode n3 = new TreeNode(n4,n5,3);
         TreeNode n2 = new TreeNode(n6,n7,2);
         TreeNode n1 = new TreeNode(n2,n3,1);
-        System.out.println(findLeastBoth(n1,n9,n10).data);
-        System.out.println(findLeastBothEasy(n1,n9,n10).data);
+//        System.out.println(findLeastBoth(n1,n9,n10).data);
+//        System.out.println(findLeastBothEasy(n1,n9,n10).data);
+
+
+//        List<List<Integer>> l1 = Arrays.asList(
+//                Arrays.asList(new Integer[]{2}),
+//                Arrays.asList(new Integer[]{3}));
+//
+//        List<List<Integer>> l2 = Arrays.asList(
+//                Arrays.asList(new Integer[]{4}),
+//                Arrays.asList(new Integer[]{5}));
+//
+//        List<List<Integer>> res = wrap(1,l1,l2);
+        List<List<Integer>> res = levelTree(n6);
+        print(res);
+                System.out.println("csdhg");
+
     }
 }
